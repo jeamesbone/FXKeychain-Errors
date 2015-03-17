@@ -40,6 +40,9 @@
 #endif
 
 
+NSString *const FXKeychainErrorDomain = @"FXKeychain";
+
+
 @implementation NSObject (FXKeychainPropertyListCoding)
 
 - (id)FXKeychain_propertyListRepresentation
@@ -137,7 +140,7 @@
     return self;
 }
 
-- (NSData *)dataForKey:(id)key
+- (NSData *)dataForKey:(id)key error:(NSError *__autoreleasing *)errorPtr
 {
 	//generate query
     NSMutableDictionary *query = [NSMutableDictionary dictionary];
@@ -158,12 +161,21 @@
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, (CFTypeRef *)&data);
 	if (status != errSecSuccess && status != errSecItemNotFound)
     {
-		NSLog(@"FXKeychain failed to retrieve data for key '%@', error: %ld", key, (long)status);
+        if (errorPtr)
+        {
+            *errorPtr = [NSError errorWithDomain:FXKeychainErrorDomain
+                                            code:FXKeychainStatusQueryError
+                                        userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to retrieve data for key '%@'", key]}];
+        }
+        else
+        {
+            NSLog(@"FXKeychain failed to retrieve data for key '%@', error: %ld", key, (long)status);
+        }
 	}
 	return CFBridgingRelease(data);
 }
 
-- (BOOL)setObject:(id)object forKey:(id)key
+- (BOOL)setObject:(id)object forKey:(id)key error:(NSError *__autoreleasing *)errorPtr
 {
     NSParameterAssert(key);
 
@@ -216,7 +228,18 @@
     }
 
     //fail if object is invalid
-    NSAssert(!object || (object && data), @"FXKeychain failed to encode object for key '%@', error: %@", key, error);
+    if (error)
+    {
+        *errorPtr = [NSError errorWithDomain:FXKeychainErrorDomain
+                                        code:FXKeychainStatusEncodingError
+                                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to encode object for key '%@'", key],
+                                               NSUnderlyingErrorKey: error}];
+        return NO;
+    }
+    else
+    {
+        NSAssert(!object || (object && data), @"FXKeychain failed to encode object for key '%@', error: %@", key, error);
+    }
 
     if (data)
     {
@@ -235,11 +258,15 @@
         
         //write data
 		OSStatus status = errSecSuccess;
-		if ([self dataForKey:key])
+		if ([self dataForKey:key error:errorPtr])
         {
 			//there's already existing data for this key, update it
 			status = SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)update);
 		}
+        else if (errorPtr && *errorPtr)
+        {
+            return NO;
+        }
         else
         {
 			//no existing data, add a new item
@@ -248,7 +275,16 @@
 		}
         if (status != errSecSuccess)
         {
-            NSLog(@"FXKeychain failed to store data for key '%@', error: %ld", key, (long)status);
+            if (errorPtr)
+            {
+                *errorPtr = [NSError errorWithDomain:FXKeychainErrorDomain
+                                                code:status
+                                            userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to store data for key '%@'", key]}];
+            }
+            else
+            {
+                NSLog(@"FXKeychain failed to store data for key '%@', error: %ld", key, (long)status);
+            }
             return NO;
         }
     }
@@ -271,26 +307,45 @@
 #endif
         if (status != errSecSuccess)
         {
-            NSLog(@"FXKeychain failed to delete data for key '%@', error: %ld", key, (long)status);
+            if (errorPtr)
+            {
+                *errorPtr = [NSError errorWithDomain:FXKeychainErrorDomain
+                                                code:status
+                                            userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to delete data for key '%@'", key]}];
+            }
+            else
+            {
+                NSLog(@"FXKeychain failed to delete data for key '%@', error: %ld", key, (long)status);
+            }
             return NO;
         }
     }
     return YES;
 }
 
+- (BOOL)setObject:(id)object forKey:(id)key
+{
+    return [self setObject:object forKey:key error:nil];
+}
+
 - (BOOL)setObject:(id)object forKeyedSubscript:(id)key
 {
-    return [self setObject:object forKey:key];
+    return [self setObject:object forKey:key error:nil];
+}
+
+- (BOOL)removeObjectForKey:(id)key error:(NSError *__autoreleasing *)errorPtr
+{
+    return [self setObject:nil forKey:key error:errorPtr];
 }
 
 - (BOOL)removeObjectForKey:(id)key
 {
-    return [self setObject:nil forKey:key];
+    return [self removeObjectForKey:key error:nil];
 }
 
-- (id)objectForKey:(id)key
+- (id)objectForKey:(id)key error:(NSError *__autoreleasing *)errorPtr
 {
-    NSData *data = [self dataForKey:key];
+    NSData *data = [self dataForKey:key error:errorPtr];
     if (data)
     {
         id object = nil;
@@ -328,7 +383,16 @@
         }
         if (!object)
         {
-             NSLog(@"FXKeychain failed to decode data for key '%@', error: %@", key, error);
+            if (errorPtr)
+            {
+                *errorPtr = [NSError errorWithDomain:FXKeychainErrorDomain
+                                                code:FXKeychainStatusDecodingError
+                                            userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to decode data for key '%@'", key]}];
+            }
+            else
+            {
+                NSLog(@"FXKeychain failed to decode data for key '%@', error: %@", key, error);
+            }
         }
         return object;
     }
@@ -337,6 +401,11 @@
         //no value found
         return nil;
     }
+}
+
+- (id)objectForKey:(id)key
+{
+    return [self objectForKey:key error:nil];
 }
 
 - (id)objectForKeyedSubscript:(id)key

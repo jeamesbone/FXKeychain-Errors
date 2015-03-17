@@ -60,6 +60,16 @@ typedef NS_ENUM(NSInteger, FXKeychainAccess)
 };
 
 
+extern NSString *const FXKeychainErrorDomain;
+
+typedef NS_ENUM(OSStatus, FXKeychainStatus)
+{
+    FXKeychainStatusQueryError = 1,
+    FXKeychainStatusEncodingError = 2,
+    FXKeychainStatusDecodingError = 3
+};
+
+
 @interface FXKeychain : NSObject
 
 + (instancetype)defaultKeychain;
@@ -75,9 +85,12 @@ typedef NS_ENUM(NSInteger, FXKeychainAccess)
 - (id)initWithService:(NSString *)service
           accessGroup:(NSString *)accessGroup;
 
+- (BOOL)setObject:(id)object forKey:(id)key error:(NSError **)error;
 - (BOOL)setObject:(id)object forKey:(id)key;
 - (BOOL)setObject:(id)object forKeyedSubscript:(id)key;
+- (BOOL)removeObjectForKey:(id)key error:(NSError **)error;
 - (BOOL)removeObjectForKey:(id)key;
+- (id)objectForKey:(id)key error:(NSError **)error;
 - (id)objectForKey:(id)key;
 - (id)objectForKeyedSubscript:(id)key;
 

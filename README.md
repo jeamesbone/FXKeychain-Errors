@@ -1,3 +1,18 @@
+FXKeychain-Errors
+------------------
+
+FXKeychain-Errors is an extension of FXKeychain that supports error handling via NSError parameters.
+
+The following three methods have been added:
+
+```objc
+- (BOOL)setObject:(id)object forKey:(id)key error:(NSError **)error;
+- (BOOL)removeObjectForKey:(id)key error:(NSError **)error;
+- (id)objectForKey:(id)key error:(NSError **)error;
+```
+
+Otherwise, the original is included documentation below.
+
 Purpose
 --------------
 

@@ -1,6 +1,6 @@
 {
   "name": "FXKeychain-Errors",
-  "version": "1.0.0-alpha",
+  "version": "1.0.0",
   "license": "zlib",
   "summary": "FXKeychain-Errors is an extension of FXKeychain that supports error handling via NSError parameters.",
   "homepage": "https://github.com/sharplet/FXKeychain-Errors",
